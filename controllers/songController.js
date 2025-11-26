@@ -31,36 +31,47 @@ export const createSong = async (req, res, next) => {
       image
     });
 
-    if (featuredArtistes && Array.isArray(featuredArtistes)) {
-      const featuredArtisteRecords = await Artiste.findAll({
-        where: { id: featuredArtistes }
-      });
+    console.log('Featured artistes payload:', featuredArtistes);
 
-      if (featuredArtisteRecords.length > 0) {
-        await song.addFeaturedArtistes(featuredArtisteRecords);
-      }
+let featuredArtisteIds = [];
+
+if (featuredArtistes) {
+  // Handle both single and multiple values from form-data
+  if (Array.isArray(featuredArtistes)) {
+    featuredArtisteIds = featuredArtistes.map(id => parseInt(id));
+  } else {
+    featuredArtisteIds = [parseInt(featuredArtistes)];
+  }
+
+  const featuredArtisteRecords = await Artiste.findAll({
+    where: { id: featuredArtisteIds }
+  });
+
+  if (featuredArtisteRecords.length > 0) {
+    await song.setFeaturedArtistes(featuredArtisteRecords);
+  }
+}
+
+const songWithDetails = await Song.findByPk(song.id, {
+  include: [
+    {
+      model: Artiste,
+      as: 'mainArtiste',
+      attributes: ['id', 'name', 'image']
+    },
+    {
+      model: Album,
+      as: 'album',
+      attributes: ['id', 'name', 'image']
+    },
+    {
+      model: Artiste,
+      as: 'featuredArtistes',
+      attributes: ['id', 'name', 'image'],
+      through: { attributes: [] }
     }
-
-    const songWithDetails = await Song.findByPk(song.id, {
-      include: [
-        {
-          model: Artiste,
-          as: 'mainArtiste',
-          attributes: ['id', 'name', 'image']
-        },
-        {
-          model: Album,
-          as: 'album',
-          attributes: ['id', 'name', 'image']
-        },
-        {
-          model: Artiste,
-          as: 'featuredArtistes',
-          attributes: ['id', 'name', 'image'],
-          through: { attributes: [] }
-        }
-      ]
-    });
+  ]
+});
 
     res.status(201).json({
       success: true,
@@ -72,9 +83,48 @@ export const createSong = async (req, res, next) => {
   }
 };
 
+// export const getAllSongs = async (req, res, next) => {
+//   try {
+//     const songs = await Song.findAll({
+//       include: [
+//         {
+//           model: Artiste,
+//           as: 'mainArtiste',
+//           attributes: ['id', 'name', 'image']
+//         },
+//         {
+//           model: Album,
+//           as: 'album',
+//           attributes: ['id', 'name', 'image']
+//         },
+//         {
+//           model: Artiste,
+//           as: 'featuredArtistes',
+//           attributes: ['id', 'name', 'image'],
+//           through: { attributes: [] }
+//         }
+//       ],
+//       order: [['createdAt', 'DESC']]
+//     });
+
+//     res.status(200).json({
+//       success: true,
+//       count: songs.length,
+//       data: { songs }
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
 export const getAllSongs = async (req, res, next) => {
   try {
-    const songs = await Song.findAll({
+    const page = parseInt(req.query.page) || 1;       // Default to page 1
+    const limit = parseInt(req.query.limit) || 10;    // Default to 10 items per page
+    const offset = (page - 1) * limit;
+
+    const { count, rows: songs } = await Song.findAndCountAll({
+      attributes: ['id', 'name'],
       include: [
         {
           model: Artiste,
@@ -93,12 +143,16 @@ export const getAllSongs = async (req, res, next) => {
           through: { attributes: [] }
         }
       ],
-      order: [['createdAt', 'DESC']]
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset
     });
 
     res.status(200).json({
       success: true,
-      count: songs.length,
+      currentPage: page,
+      totalPages: Math.ceil(count / limit),
+      totalItems: count,
       data: { songs }
     });
   } catch (error) {
@@ -113,17 +167,20 @@ export const getSongById = async (req, res, next) => {
         {
           model: Artiste,
           as: 'mainArtiste',
-          attributes: ['id', 'name', 'image', 'desc']
+          attributes: ['id', 'name']
+          // attributes: ['id', 'name', 'image', 'desc']
         },
         {
           model: Album,
           as: 'album',
-          attributes: ['id', 'name', 'image', 'releaseYear']
+          attributes: ['id', 'name']
+          // attributes: ['id', 'name', 'image', 'releaseYear']
         },
         {
           model: Artiste,
           as: 'featuredArtistes',
-          attributes: ['id', 'name', 'image'],
+          // attributes: ['id', 'name', 'image'],
+          attributes: ['id', 'name'],
           through: { attributes: [] }
         }
       ]

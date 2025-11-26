@@ -30,9 +30,36 @@ export const createAlbum = async (req, res, next) => {
   }
 };
 
+// export const getAllAlbums = async (req, res, next) => {
+//   try {
+//     const albums = await Album.findAll({
+//       include: [
+//         {
+//           model: Artiste,
+//           as: 'artiste',
+//           attributes: ['id', 'name', 'image']
+//         }
+//       ],
+//       order: [['releaseYear', 'DESC']]
+//     });
+
+//     res.status(200).json({
+//       success: true,
+//       count: albums.length,
+//       data: { albums }
+//     });
+//   } catch (error) {
+//     next(error);
+//   }
+// };
+
 export const getAllAlbums = async (req, res, next) => {
   try {
-    const albums = await Album.findAll({
+    const page = parseInt(req.query.page) || 1;       // Default to page 1
+    const limit = parseInt(req.query.limit) || 10;    // Default to 10 albums per page
+    const offset = (page - 1) * limit;
+
+    const { count, rows: albums } = await Album.findAndCountAll({
       include: [
         {
           model: Artiste,
@@ -40,12 +67,16 @@ export const getAllAlbums = async (req, res, next) => {
           attributes: ['id', 'name', 'image']
         }
       ],
-      order: [['releaseYear', 'DESC']]
+      order: [['releaseYear', 'DESC']],
+      limit,
+      offset
     });
 
     res.status(200).json({
       success: true,
-      count: albums.length,
+      currentPage: page,
+      totalPages: Math.ceil(count / limit),
+      totalItems: count,
       data: { albums }
     });
   } catch (error) {
@@ -65,19 +96,20 @@ export const getAlbumById = async (req, res, next) => {
         {
           model: Song,
           as: 'songs',
-          include: [
-            {
-              model: Artiste,
-              as: 'mainArtiste',
-              attributes: ['id', 'name', 'image']
-            },
-            {
-              model: Artiste,
-              as: 'featuredArtistes',
-              attributes: ['id', 'name', 'image'],
-              through: { attributes: [] }
-            }
-          ]
+          attributes: ['id', 'name']
+          // include: [
+          //   {
+          //     model: Artiste,
+          //     as: 'mainArtiste',
+          //     attributes: ['id', 'name', 'image']
+          //   },
+          //   {
+          //     model: Artiste,
+          //     as: 'featuredArtistes',
+          //     attributes: ['id', 'name', 'image'],
+          //     through: { attributes: [] }
+          //   }
+          // ]
         }
       ]
     });
